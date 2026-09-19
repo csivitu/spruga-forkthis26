@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArchNav 3D - Multi-Floor Navigation System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome & Google Fonts -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            overflow: hidden;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar for modern styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .active-glow {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            cyan: '#06b6d4',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            slate: '#0b0f19',
+                            darkBlue: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full flex flex-col select-none">
+
+    <!-- Header bar -->
+    <header class="h-16 flex items-center justify-between px-6 border-b border-white/10 glass-panel shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="h-9 w-9 bg-brand-cyan/20 border border-brand-cyan/50 rounded-xl flex items-center justify-center text-brand-cyan active-glow">
+                <i class="fa-solid fa-layer-group text-lg animate-pulse"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-none tracking-tight">ArchNav <span class="text-brand-cyan">3D</span></h1>
+                <p class="text-xs text-slate-400 mt-1">Multi-Floor Interior Routing & Spatial Diagnostics</p>
+            </div>
+        </div>
+        
+        <!-- Live telemetry ribbon -->
+        <div class="hidden lg:flex items-center gap-6 text-xs code-font">
+            <div class="flex items-center gap-2 bg-slate-900/60 py-1.5 px-3 rounded-lg border border-white/5">
+                <span class="h-2 w-2 rounded-full bg-brand-emerald animate-ping"></span>
+                <span class="text-slate-400">FPS:</span>
+                <span id="telemetry-fps" class="text-brand-emerald font-semibold">60</span>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-900/60 py-1.5 px-3 rounded-lg border border-white/5">
+                <i class="fa-solid fa-satellite-dish text-brand-cyan"></i>
+                <span class="text-slate-400">Positioning:</span>
+                <span class="text-brand-cyan font-semibold">BLE Trilateration Active</span>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-900/60 py-1.5 px-3 rounded-lg border border-white/5">
+                <i class="fa-solid fa-fingerprint text-brand-amber"></i>
+                <span class="text-slate-400">Anchor ID:</span>
+                <span id="telemetry-anchor" class="text-brand-amber font-semibold">MAIN_LOBBY_01</span>
+            </div>
+        </div>
+
+        <!-- Quick Help toggle -->
+        <button onclick="toggleHelpModal()" class="h-9 px-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/10 text-xs flex items-center gap-2">
+            <i class="fa-solid fa-circle-question"></i> Help Guide
+        </button>
+    </header>
+
+    <!-- Main Frame -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Left Sidebar - Search & Diagnostics -->
+        <aside class="w-80 h-full flex flex-col border-r border-white/10 glass-panel z-10 p-4 gap-4 shrink-0 overflow-y-auto">
+            
+            <!-- Quick search & Routing configuration -->
+            <div class="flex flex-col gap-2">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Spatial Search</h2>
+                <div class="relative mt-1">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <select id="destination-select" onchange="calculateRoute()" class="w-full pl-9 pr-4 py-2 bg-slate-950/80 border border-white/10 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-cyan appearance-none cursor-pointer">
+                        <option value="">Select Destination Target...</option>
+                        <optgroup label="Floor 0 - Lobby & Logistics">
+                            <option value="f0_lobby">Floor 0 - Main Lobby Entrance</option>
+                            <option value="f0_office_west">Floor 0 - Workspace West Wing</option>
+                            <option value="f0_elevator">Floor 0 - Elevator Portal</option>
+                        </optgroup>
+                        <optgroup label="Floor 1 - Management Suites">
+                            <option value="f1_exec_suite">Floor 1 - Executive Suite 101</option>
+                            <option value="f1_elevator">Floor 1 - Elevator Landing</option>
+                        </optgroup>
+                        <optgroup label="Floor 2 - Boardrooms & Dining">
+                            <option value="f2_boardroom">Floor 2 - Executive Boardroom</option>
+                            <option value="f2_cafeteria">Floor 2 - Sky Cafeteria</option>
+                            <option value="f2_elevator">Floor 2 - Elevator Hub</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Start Point Setup -->
+            <div class="flex flex-col gap-2">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Starting Point</h2>
+                <select id="start-select" onchange="calculateRoute()" class="w-full px-3 py-2 bg-slate-950/80 border border-white/10 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-cyan appearance-none cursor-pointer">
+                    <option value="f0_lobby">Floor 0 - Main Lobby Entrance</option>
+                    <option value="f0_office_west">Floor 0 - Workspace West Wing</option>
+                    <option value="f1_exec_suite">Floor 1 - Executive Suite 101</option>
+                    <option value="f2_boardroom">Floor 2 - Executive Boardroom</option>
+                    <option value="f2_cafeteria">Floor 2 - Sky Cafeteria</option>
+                </select>
+            </div>
+
+            <!-- Routing Profile selection -->
+            <div class="flex flex-col gap-2">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Routing Profile</h2>
+                <div class="grid grid-cols-2 gap-2 mt-1">
+                    <button id="profile-standard" onclick="setRoutingProfile('standard')" class="flex flex-col items-center gap-2 p-3 rounded-xl border border-brand-cyan bg-brand-cyan/10 text-brand-cyan transition-all">
+                        <i class="fa-solid fa-route text-lg"></i>
+                        <span class="text-xs font-semibold">Standard Route</span>
+                    </button>
+                    <button id="profile-access" onclick="setRoutingProfile('accessibility')" class="flex flex-col items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-slate-100 transition-all">
+                        <i class="fa-solid fa-wheelchair text-lg"></i>
+                        <span class="text-xs font-semibold">Step-Free / ADA</span>
+                    </button>
+                </div>
+                <p id="profile-desc" class="text-[10px] text-slate-400 mt-1 italic">
+                    Utilizes stairs, ramps, and elevators to calculate the fastest path.
+                </p>
+            </div>
+
+            <!-- Floor Visibility Controls -->
+            <div class="flex flex-col gap-2">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Vertical Visibility</h2>
+                <div class="flex flex-col gap-1.5 mt-1">
+                    <button onclick="toggleFloorVisibility(2)" id="floor-btn-2" class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-slate-300 text-xs hover:bg-slate-800/80 transition-all">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-building text-slate-400"></i> Floor 2 (Penthouse / Boardroom)
+                        </span>
+                        <i id="floor-eye-2" class="fa-solid fa-eye text-brand-cyan"></i>
+                    </button>
+                    <button onclick="toggleFloorVisibility(1)" id="floor-btn-1" class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-slate-300 text-xs hover:bg-slate-800/80 transition-all">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-building text-slate-400"></i> Floor 1 (Offices)
+                        </span>
+                        <i id="floor-eye-1" class="fa-solid fa-eye text-brand-cyan"></i>
+                    </button>
+                    <button onclick="toggleFloorVisibility(0)" id="floor-btn-0" class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-slate-300 text-xs hover:bg-slate-800/80 transition-all">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-building text-slate-400"></i> Floor 0 (Lobby)
+                        </span>
+                        <i id="floor-eye-0" class="fa-solid fa-eye text-brand-cyan"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation diagnostics & Telemetry -->
+            <div class="flex-1 flex flex-col justify-end mt-4">
+                <div class="bg-slate-950/80 border border-white/10 rounded-xl p-3 flex flex-col gap-2 text-xs code-font">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 uppercase font-bold border-b border-white/10 pb-1.5 mb-1">
+                        <span>Telemetry Console</span>
+                        <i class="fa-solid fa-terminal animate-pulse"></i>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Path Status:</span>
+                        <span id="telemetry-status" class="text-brand-amber font-semibold">Awaiting Target...</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Est. Distance:</span>
+                        <span id="telemetry-distance" class="text-slate-200">0.0m</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Est. Walk Time:</span>
+                        <span id="telemetry-time" class="text-slate-200">0s</span>
+                    </div>
+                    <div class="flex justify-between border-t border-white/10 pt-1.5 mt-1">
+                        <span class="text-slate-400">Current Node:</span>
+                        <span id="telemetry-node" class="text-brand-cyan font-bold">f0_lobby</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Viewport -->
+        <main class="flex-1 h-full relative overflow-hidden flex flex-col">
+            
+            <!-- Live Three.js Canvas container -->
+            <div id="three-container" class="flex-1 w-full h-full relative"></div>
+
+            <!-- Overlay Hud (Active navigation guide) -->
+            <div id="nav-overlay" class="absolute top-4 right-4 max-w-sm w-full glass-panel rounded-2xl p-4 shadow-2xl flex flex-col gap-3 transition-opacity duration-300 opacity-0 z-10 pointer-events-none">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="h-8 w-8 bg-brand-emerald/10 border border-brand-emerald/40 text-brand-emerald rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-location-arrow"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm">Active Navigation</h3>
+                            <p class="text-[10px] text-slate-400 font-medium">Real-Time Routing Diagnostics</p>
+                        </div>
+                    </div>
+                    <!-- Stop routing button -->
+                    <button onclick="clearRouting()" class="p-1 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 border border-white/10 pointer-events-auto">
+                        <i class="fa-solid fa-xmark"></i> Stop
+                    </button>
+                </div>
+                
+                <div class="bg-slate-950/80 border border-white/5 rounded-xl p-3 flex flex-col gap-2">
+                    <div class="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                        <span id="nav-step-icon" class="text-brand-cyan"><i class="fa-solid fa-arrow-right"></i></span>
+                        <span id="nav-step-text">Checking path configurations...</span>
+                    </div>
+                    <p id="nav-step-subtext" class="text-[11px] text-slate-400">Initializing 3D mathematical spline vector mapping.</p>
+                </div>
+
+                <!-- Simulation Progress / Playback controls -->
+                <div class="flex items-center justify-between border-t border-white/10 pt-3 mt-1 pointer-events-auto">
+                    <div class="flex items-center gap-2">
+                        <button id="sim-play-btn" onclick="toggleRouteSimulation()" class="h-8 px-3 rounded-lg bg-brand-cyan text-slate-950 hover:bg-brand-cyan/80 transition-all font-bold text-xs flex items-center gap-1.5">
+                            <i id="sim-play-icon" class="fa-solid fa-play"></i> <span id="sim-play-text">Simulate</span>
+                        </button>
+                    </div>
+                    <div class="text-[10px] text-slate-400 code-font">
+                        Node: <span id="sim-node-counter" class="text-slate-200">0/0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zero-drift scan anchors interface -->
+            <div class="absolute bottom-4 left-4 glass-panel rounded-xl p-3 flex flex-col gap-2 shadow-lg z-10">
+                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zero-Drift calibration</h4>
+                <div class="flex gap-2">
+                    <button onclick="triggerCalibrationAnchor('MAIN_LOBBY_01')" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] border border-white/10 flex items-center gap-1.5 text-slate-300 transition-all">
+                        <i class="fa-solid fa-qrcode text-brand-cyan"></i> Reset at Lobby
+                    </button>
+                    <button onclick="triggerCalibrationAnchor('WEST_OFFICE_02')" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] border border-white/10 flex items-center gap-1.5 text-slate-300 transition-all">
+                        <i class="fa-solid fa-qrcode text-brand-emerald"></i> Reset at Office
+                    </button>
+                </div>
+            </div>
+
+            <!-- High tech scanning pulse utility controller -->
+            <div class="absolute bottom-4 right-4 flex gap-2 z-10">
+                <button onclick="triggerAcousticScanPulse()" class="h-10 px-4 rounded-xl bg-brand-emerald/10 border border-brand-emerald/40 text-brand-emerald hover:bg-brand-emerald/20 transition-all font-bold text-xs flex items-center gap-2 active-glow">
+                    <i class="fa-solid fa-wave-square animate-pulse"></i> Scan Structure (Lidar Pulse)
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Help Modal Overlay -->
+    <div id="help-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-filter backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="max-w-md w-full glass-panel rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 class="font-bold text-lg text-brand-cyan flex items-center gap-2">
+                    <i class="fa-solid fa-circle-question"></i> System Operating Guide
+                </h3>
+                <button onclick="toggleHelpModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+                <p>Welcome to the <strong>ArchNav 3D Interior Navigation System</strong> prototype, built using a 1:1 scale model matching actual scanning coordinates.</p>
+                
+                <h4 class="font-semibold text-slate-200 mt-2 text-xs uppercase tracking-wider text-brand-amber">Core Navigation Mechanics:</h4>
+                <ul class="list-disc pl-5 flex flex-col gap-1 text-xs">
+                    <li><strong>Horizontal Routing:</strong> Waypoints on the same level calculate routes cleanly.</li>
+                    <li><strong>Vertical Transitions (Stairs):</strong> Standard profiles automatically climb the spiral stairwell linking different levels.</li>
+                    <li><strong>Vertical Portal (Elevator):</strong> If you toggle the <strong>Step-Free / ADA</strong> option, the engine dynamically excludes stairs and routes path lines directly through the vertical glass elevator shaft.</li>
+                    <li><strong>Dynamic Layer Culling:</strong> Select floors on the sidebar to cull ceiling plates and view path routing directly inside rooms.</li>
+                    <li><strong>Simulation Playback:</strong> Hit the <strong>"Simulate"</strong> button once a route is calculated to watch a marker navigate the route in 3D.</li>
+                </ul>
+            </div>
+            <button onclick="toggleHelpModal()" class="w-full mt-2 py-2.5 rounded-xl bg-brand-cyan hover:bg-brand-cyan/80 text-slate-950 font-bold transition-colors">
+                Initialize System View
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating System Toast Overlay -->
+    <div id="toast-overlay" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-950 border border-brand-cyan/30 text-brand-cyan text-xs font-semibold code-font opacity-0 pointer-events-none transition-all z-50 shadow-xl flex items-center gap-2">
+        <i class="fa-solid fa-circle-check"></i> <span id="toast-text">System Calibrated.</span>
+    </div>
+
+    <!-- Scripts & Core Mechanics -->
+    <script>
+        /* ==========================================
+           1. SPATIAL TOPOLOGY & ROUTING DEFINITION
+           ========================================== */
+        // Explicit coordinates representing 1:1 indoor scale coordinates in 3D space.
+        const nodes = {
+            // Floor 0 (Elevations Y = 0)
+            'f0_lobby': { x: 0, y: 0, z: 12, floor: 0, label: 'Floor 0 - Main Lobby' },
+            'f0_office_west': { x: -16, y: 0, z: 5, floor: 0, label: 'Floor 0 - Workspace West' },
+            'f0_elevator': { x: -12, y: 0, z: -12, floor: 0, label: 'Floor 0 - Elevator Portal' },
+            'f0_stairs': { x: 8, y: 0, z: 0, floor: 0, label: 'Floor 0 - Stairwell' },
+            'f0_corridor': { x: 0, y: 0, z: 0, floor: 0, label: 'Floor 0 - Hallway Connector' },
+            
+            // Floor 1 (Elevations Y = 10)
+            'f1_stairs': { x: 8, y: 10, z: 0, floor: 1, label: 'Floor 1 - Stairwell Landing' },
+            'f1_elevator': { x: -12, y: 10, z: -12, floor: 1, label: 'Floor 1 - Elevator Portal' },
+            'f1_exec_suite': { x: 12, y: 10, z: 8, floor: 1, label: 'Floor 1 - Executive Suite 101' },
+            'f1_corridor': { x: 0, y: 10, z: 0, floor: 1, label: 'Floor 1 - Hallway Connector' },
+            'f1_stairs_up': { x: 8, y: 10, z: -4, floor: 1, label: 'Floor 1 - Stairwell (To F2)' },
+            
+            // Floor 2 (Elevations Y = 20)
+            'f2_stairs': { x: 8, y: 20, z: -4, floor: 2, label: 'Floor 2 - Stairwell Landing' },
+            'f2_elevator': { x: -12, y: 20, z: -12, floor: 2, label: 'Floor 2 - Elevator Hub' },
+            'f2_boardroom': { x: 6, y: 20, z: 12, floor: 2, label: 'Floor 2 - Executive Boardroom' },
+            'f2_cafeteria': { x: -14, y: 20, z: 8, floor: 2, label: 'Floor 2 - Sky Cafeteria' },
+            'f2_corridor': { x: 0, y: 20, z: 0, floor: 2, label: 'Floor 2 - Hallway Connector' }
+        };
+
+        // Graph connections (bidirectional) with vertical type markers to allow accessibility filtering
+        const connections = [
+            // Floor 0 local
+            { from: 'f0_lobby', to: 'f0_corridor', type: 'flat' },
+            { from: 'f0_office_west', to: 'f0_corridor', type: 'flat' },
+            { from: 'f0_elevator', to: 'f0_corridor', type: 'flat' },
+            { from: 'f0_stairs', to: 'f0_corridor', type: 'flat' },
+
+            // Floor 0 to Floor 1 Stairwell Connector
+            { from: 'f0_stairs', to: 'f1_stairs', type: 'stairs' },
+
+            // Floor 1 local
+            { from: 'f1_stairs', to: 'f1_corridor', type: 'flat' },
+            { from: 'f1_elevator', to: 'f1_corridor', type: 'flat' },
+            { from: 'f1_exec_suite', to: 'f1_corridor', type: 'flat' },
+            { from: 'f1_stairs_up', to: 'f1_corridor', type: 'flat' },
+
+            // Floor 1 to Floor 2 Stairwell Connector
+            { from: 'f1_stairs_up', to: 'f2_stairs', type: 'stairs' },
+
+            // Floor 2 local
+            { from: 'f2_stairs', to: 'f2_corridor', type: 'flat' },
+            { from: 'f2_elevator', to: 'f2_corridor', type: 'flat' },
+            { from: 'f2_boardroom', to: 'f2_corridor', type: 'flat' },
+            { from: 'f2_cafeteria', to: 'f2_corridor', type: 'flat' },
+
+            // Elevator Portals (Vertical connection bridges)
+            { from: 'f0_elevator', to: 'f1_elevator', type: 'elevator' },
+            { from: 'f1_elevator', to: 'f2_elevator', type: 'elevator' }
+        ];
+
+        // Core App State Configuration
+        let routingProfile = 'standard'; // 'standard' or 'accessibility'
+        let startNodeId = 'f0_lobby';
+        let destNodeId = '';
+        let floorVisibility = { 0: true, 1: true, 2: true };
+        
+        // 3D Runtime Global Variables
+        let scene, camera, renderer, controls;
+        let floorPlates = {};
+        let architecturalWalls = [];
+        let waypointVisuals = {};
+        let activePathMesh = null;
+        let elevatorCabMesh = null;
+        
+        // Simulation details
+        let simulationActive = false;
+        let simInterval = null;
+        let simMarker = null;
+        let currentSimPath = [];
+        let currentSimIndex = 0;
+
+        /* ==========================================
+           2. DIJKSTRA / A* ENGINE FOR WEB PATHS
+           ========================================== */
+        function solvePathfinding(start, target, profile) {
+            // Build adjacency list dynamically depending on active profile constraints
+            const adjacency = {};
+            for (const nodeId in nodes) {
+                adjacency[nodeId] = [];
+            }
+
+            connections.forEach(edge => {
+                // If Profile = Accessibility (ADA), completely ignore stairway connections
+                if (profile === 'accessibility' && edge.type === 'stairs') {
+                    return; 
+                }
+
+                const nA = nodes[edge.from];
+                const nB = nodes[edge.to];
+                
+                // Real distance calculation (Euclidean metrics)
+                let weight = Math.sqrt(
+                    Math.pow(nA.x - nB.x, 2) +
+                    Math.pow(nA.y - nB.y, 2) +
+                    Math.pow(nA.z - nB.z, 2)
+                );
+
+                // Add wait penalties on portals to emulate real-world wait times
+                if (edge.type === 'elevator') {
+                    weight += 8.0; // Simulated elevator vertical latency delay
+                } else if (edge.type === 'stairs') {
+                    weight *= 1.3; // Scaling penalty for stair elevation climbing
+                }
+
+                adjacency[edge.from].push({ node: edge.to, weight });
+                adjacency[edge.to].push({ node: edge.from, weight });
+            });
+
+            // Standard Dijkstra algorithm
+            const distances = {};
+            const previous = {};
+            const unvisited = new Set();
+
+            for (const nodeId in nodes) {
+                distances[nodeId] = Infinity;
+                previous[nodeId] = null;
+                unvisited.add(nodeId);
+            }
+            distances[start] = 0;
+
+            while (unvisited.size > 0) {
+                // Find node with smallest distance
+                let minNode = null;
+                unvisited.forEach(nodeId => {
+                    if (minNode === null || distances[nodeId] < distances[minNode]) {
+                        minNode = nodeId;
+                    }
+                });
+
+                if (minNode === null || distances[minNode] === Infinity) break;
+                if (minNode === target) break;
+
+                unvisited.delete(minNode);
+
+                adjacency[minNode].forEach(neighbor => {
+                    if (unvisited.has(neighbor.node)) {
+                        const newDist = distances[minNode] + neighbor.weight;
+                        if (newDist < distances[neighbor.node]) {
+                            distances[neighbor.node] = newDist;
+                            previous[neighbor.node] = minNode;
+                        }
+                    }
+                });
+            }
+
+            // Reconstruction
+            const path = [];
+            let current = target;
+            while (current !== null) {
+                path.unshift(current);
+                current = previous[current];
+            }
+
+            return path[0] === start ? path : [];
+        }
+
+        /* ==========================================
+           3. UI CONTROLS & MANAGEMENT
+           ========================================== */
+        function showToast(text) {
+            const toast = document.getElementById('toast-overlay');
+            document.getElementById('toast-text').innerText = text;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 3000);
+        }
+
+        function toggleHelpModal() {
+            const modal = document.getElementById('help-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function setRoutingProfile(profile) {
+            routingProfile = profile;
+            const stdBtn = document.getElementById('profile-standard');
+            const accBtn = document.getElementById('profile-access');
+            const desc = document.getElementById('profile-desc');
+
+            if (profile === 'standard') {
+                stdBtn.className = 'flex flex-col items-center gap-2 p-3 rounded-xl border border-brand-cyan bg-brand-cyan/10 text-brand-cyan transition-all';
+                accBtn.className = 'flex flex-col items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-slate-100 transition-all';
+                desc.innerText = 'Utilizes stairs, ramps, and elevators to calculate the fastest path.';
+            } else {
+                accBtn.className = 'flex flex-col items-center gap-2 p-3 rounded-xl border border-brand-cyan bg-brand-cyan/10 text-brand-cyan transition-all';
+                stdBtn.className = 'flex flex-col items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 text-slate-400 hover:text-slate-100 transition-all';
+                desc.innerText = 'Excludes stairs. Directs paths exclusively through elevators and level surfaces.';
+            }
+            showToast(`Profile updated to: ${profile === 'standard' ? 'Standard' : 'Accessible'}`);
+            calculateRoute();
+        }
+
+        function toggleFloorVisibility(floorNum) {
+            floorVisibility[floorNum] = !floorVisibility[floorNum];
+            const btn = document.getElementById(`floor-btn-${floorNum}`);
+            const eye = document.getElementById(`floor-eye-${floorNum}`);
+            
+            if (floorVisibility[floorNum]) {
+                btn.classList.remove('opacity-55');
+                eye.className = 'fa-solid fa-eye text-brand-cyan';
+                showToast(`Floor ${floorNum} layout visible`);
+            } else {
+                btn.classList.add('opacity-55');
+                eye.className = 'fa-solid fa-eye-slash text-slate-500';
+                showToast(`Floor ${floorNum} layout occluded`);
+            }
+            update3DFloorsVisibility();
+        }
+
+        function update3DFloorsVisibility() {
+            for (const floor in floorPlates) {
+                const group = floorPlates[floor];
+                if (group) {
+                    group.visible = floorVisibility[floor];
+                }
+            }
+            // Update wall transparency based on visible floor plates
+            architecturalWalls.forEach(wall => {
+                wall.visible = floorVisibility[wall.userData.floor];
+            });
+        }
+
+        function triggerCalibrationAnchor(anchorName) {
+            document.getElementById('telemetry-anchor').innerText = anchorName;
+            
+            // Relocalize simulator / search based on selected anchor
+            if (anchorName === 'MAIN_LOBBY_01') {
+                startNodeId = 'f0_lobby';
+                document.getElementById('start-select').value = 'f0_lobby';
+            } else {
+                startNodeId = 'f0_office_west';
+                document.getElementById('start-select').value = 'f0_office_west';
+            }
+            
+            document.getElementById('telemetry-node').innerText = startNodeId;
+            showToast(`Zero-drift position calibrated to ${anchorName}`);
+            calculateRoute();
+        }
+
+        // Generate high-fidelity turn-by-turn navigation instructions
+        function generateRouteDirections(path) {
+            if (path.length === 0) return { main: 'Target Unreachable', sub: 'Adjust routing profiling options.' };
+            
+            let steps = [];
+            let stairsCount = 0;
+            let elevatorCount = 0;
+            
+            for (let i = 0; i < path.length - 1; i++) {
+                const nodeA = nodes[path[i]];
+                const nodeB = nodes[path[i+1]];
+                
+                // Identify connection characteristics
+                const connectionEdge = connections.find(c => 
+                    (c.from === path[i] && c.to === path[i+1]) || 
+                    (c.from === path[i+1] && c.to === path[i])
+                );
+                
+                if (connectionEdge && connectionEdge.type === 'stairs') {
+                    stairsCount++;
+                } else if (connectionEdge && connectionEdge.type === 'elevator') {
+                    elevatorCount++;
+                }
+            }
+
+            const finalTarget = nodes[path[path.length - 1]];
+            
+            let mainStr = `Proceed to ${finalTarget.label}`;
+            let subStr = '';
+
+            if (elevatorCount > 0 && stairsCount > 0) {
+                subStr = `Dynamic multi-level route using elevator & stairs.`;
+            } else if (elevatorCount > 0) {
+                subStr = `Direct elevator access route (Fully ADA Compliant).`;
+            } else if (stairsCount > 0) {
+                subStr = `Staircase climbing required across levels.`;
+            } else {
+                subStr = `Level navigation across same floor layout.`;
+            }
+
+            return { main: mainStr, sub: subStr };
+        }
+
+        /* ==========================================
+           4. 3D WEB ENGINEERING (THREE.JS INTEGRATION)
+           ========================================== */
+        function init3DEngine() {
+            const container = document.getElementById('three-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene and Sky environment
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#060913');
+            scene.fog = new THREE.FogExp2('#060913', 0.005);
+
+            // Camera setup - High precision Orthographic or isometric look
+            camera = new THREE.PerspectiveCamera(45, width / height, 1, 1000);
+            camera.position.set(40, 50, 60);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent camera from dipping below structural floor plane
+            controls.minDistance = 15;
+            controls.maxDistance = 180;
+
+            // Ambient, direction, & atmospheric key lighting
+            const ambientLight = new THREE.AmbientLight('#1e293b', 0.8);
+            scene.add(ambientLight);
+
+            const directLight = new THREE.DirectionalLight('#06b6d4', 1.8);
+            directLight.position.set(30, 80, 40);
+            directLight.castShadow = true;
+            directLight.shadow.mapSize.width = 2048;
+            directLight.shadow.mapSize.height = 2048;
+            directLight.shadow.bias = -0.0001;
+            scene.add(directLight);
+
+            const secondaryLight = new THREE.PointLight('#f59e0b', 0.8, 100);
+            secondaryLight.position.set(-30, 20, -30);
+            scene.add(secondaryLight);
+
+            // Build architecture mockup
+            generateBuildingMockup();
+
+            // Setup waypoint indicators
+            generateWaypoints();
+
+            // Window Resizing handlers
+            window.addEventListener('resize', onWindowResize);
+
+            // Initialize rendering loop
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('three-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function generateBuildingMockup() {
+            const floorMaterial = new THREE.MeshStandardMaterial({
+                color: '#111827',
+                roughness: 0.7,
+                metalness: 0.1,
+                transparent: true,
+                opacity: 0.75
+            });
+
+            const floorBorderMaterial = new THREE.LineBasicMaterial({ color: '#1e293b', linewidth: 2 });
+            const wallsMaterial = new THREE.MeshStandardMaterial({
+                color: '#0f172a',
+                roughness: 0.8,
+                metalness: 0.1,
+                transparent: true,
+                opacity: 0.35,
+                wireframe: false
+            });
+
+            const floorPlatesCount = 3;
+            const heightMultiplier = 10; // Vertical gap between floor levels in Three.js coordinates
+
+            for (let f = 0; f < floorPlatesCount; f++) {
+                // Group each floor's interior models for modular visibility
+                const floorGroup = new THREE.Group();
+                
+                // Floor plane (Base)
+                const geometry = new THREE.BoxGeometry(45, 0.4, 35);
+                const baseMesh = new THREE.Mesh(geometry, floorMaterial);
+                baseMesh.position.y = f * heightMultiplier;
+                baseMesh.receiveShadow = true;
+                floorGroup.add(baseMesh);
+
+                // Tech-styled outer grid framing
+                const edges = new THREE.EdgesGeometry(geometry);
+                const line = new THREE.LineSegments(edges, floorBorderMaterial);
+                line.position.y = f * heightMultiplier;
+                floorGroup.add(line);
+
+                // Add room divider mock walls
+                generateRoomWalls(floorGroup, f, wallsMaterial);
+
+                scene.add(floorGroup);
+                floorPlates[f] = floorGroup;
+            }
+
+            // Create structural Elevator Shaft model
+            const shaftGeometry = new THREE.BoxGeometry(4, 30, 4);
+            const shaftEdges = new THREE.EdgesGeometry(shaftGeometry);
+            const shaftBorderMat = new THREE.LineBasicMaterial({ color: '#06b6d4', transparent: true, opacity: 0.4 });
+            const shaftLine = new THREE.LineSegments(shaftEdges, shaftBorderMat);
+            shaftLine.position.set(-12, 10, -12);
+            scene.add(shaftLine);
+
+            // Create active wireframe elevator cab mesh
+            const cabGeometry = new THREE.BoxGeometry(3.2, 3.2, 3.2);
+            const cabMaterial = new THREE.MeshStandardMaterial({
+                color: '#06b6d4',
+                roughness: 0.2,
+                metalness: 0.8,
+                transparent: true,
+                opacity: 0.6
+            });
+            elevatorCabMesh = new THREE.Mesh(cabGeometry, cabMaterial);
+            elevatorCabMesh.position.set(-12, 0, -12);
+            scene.add(elevatorCabMesh);
+
+            // Create staircase geometry visuals (spiral path wrapper representation)
+            const staircaseMat = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.5 });
+            for (let f = 0; f < floorPlatesCount - 1; f++) {
+                const yOffset = f * heightMultiplier;
+                const steps = 14;
+                for (let i = 0; i < steps; i++) {
+                    const progress = i / steps;
+                    const stepGeom = new THREE.BoxGeometry(3, 0.2, 1);
+                    const stepMesh = new THREE.Mesh(stepGeom, staircaseMat);
+                    
+                    // Arc rotation
+                    const angle = progress * Math.PI * 0.8;
+                    const radius = 3.5;
+                    stepMesh.position.set(8 + Math.cos(angle) * radius, yOffset + progress * heightMultiplier, Math.sin(angle) * radius);
+                    stepMesh.rotation.y = -angle;
+                    scene.add(stepMesh);
+                }
+            }
+        }
+
+        function generateRoomWalls(group, floorIndex, material) {
+            // Helper to generate simple wall bounding blockages
+            const wallCreator = (w, h, d, x, z, angle = 0) => {
+                const geometry = new THREE.BoxGeometry(w, h, d);
+                const wall = new THREE.Mesh(geometry, material);
+                wall.position.set(x, (floorIndex * 10) + h/2, z);
+                wall.rotation.y = angle;
+                wall.userData = { floor: floorIndex };
+                group.add(wall);
+                architecturalWalls.push(wall);
+            };
+
+            // Setup walls depending on logical layout of different floor plates
+            if (floorIndex === 0) {
+                wallCreator(0.4, 6, 12, -8, 8); // West office divider
+                wallCreator(12, 6, 0.4, -14, 2); // West office inner
+                wallCreator(0.4, 6, 8, 4, 10, Math.PI / 4); // Lobby corridor diagonal
+            } else if (floorIndex === 1) {
+                wallCreator(15, 6, 0.4, 4, 4); // Corridor partition
+                wallCreator(0.4, 6, 10, -3, -1); 
+            } else if (floorIndex === 2) {
+                wallCreator(0.4, 6, 15, -4, 4); // Cafeteria glass partition
+                wallCreator(12, 6, 0.4, 4, -4); // Boardroom rear wall
+            }
+        }
+
+        function generateWaypoints() {
+            // Base physical pins indicating navigational target junctions
+            const pinGeometry = new THREE.CylinderGeometry(0.0, 0.4, 1.2, 6);
+            const pinMaterial = new THREE.MeshStandardMaterial({
+                color: '#334155',
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            for (const key in nodes) {
+                const node = nodes[key];
+                
+                // Exclude raw transition nodes like hallways/corridors from drawing big target indicators
+                if (key.includes('corridor') || key.includes('stairs_up')) continue;
+
+                const pinMesh = new THREE.Mesh(pinGeometry, pinMaterial);
+                // Invert pin so point faces directly towards waypoint floor plane
+                pinMesh.rotation.x = Math.PI;
+                pinMesh.position.set(node.x, node.y + 1.5, node.z);
+                
+                scene.add(pinMesh);
+                waypointVisuals[key] = pinMesh;
+            }
+        }
+
+        function calculateRoute() {
+            // Collect selected form options
+            startNodeId = document.getElementById('start-select').value;
+            destNodeId = document.getElementById('destination-select').value;
+
+            if (!destNodeId) {
+                clearRouting();
+                return;
+            }
+
+            document.getElementById('telemetry-node').innerText = startNodeId;
+
+            // Run Dijkstra solver logic
+            const rawPath = solvePathfinding(startNodeId, destNodeId, routingProfile);
+
+            if (rawPath.length === 0) {
+                document.getElementById('telemetry-status').className = 'text-brand-amber font-semibold';
+                document.getElementById('telemetry-status').innerText = 'Unreachable Destination';
+                clearRoutingMesh();
+                return;
+            }
+
+            // Route directions text update
+            const directions = generateRouteDirections(rawPath);
+            document.getElementById('nav-step-text').innerText = directions.main;
+            document.getElementById('nav-step-subtext').innerText = directions.sub;
+
+            // Animate dynamic overlay panels in
+            const navOverlay = document.getElementById('nav-overlay');
+            navOverlay.style.opacity = '1';
+            navOverlay.style.pointerEvents = 'auto';
+
+            // Measure accurate cumulative distance metrics
+            let totalDist = 0;
+            for (let i = 0; i < rawPath.length - 1; i++) {
+                const nA = nodes[rawPath[i]];
+                const nB = nodes[rawPath[i+1]];
+                totalDist += Math.sqrt(
+                    Math.pow(nA.x - nB.x, 2) +
+                    Math.pow(nA.y - nB.y, 2) +
+                    Math.pow(nA.z - nB.z, 2)
+                );
+            }
+
+            document.getElementById('telemetry-status').className = 'text-brand-emerald font-semibold';
+            document.getElementById('telemetry-status').innerText = 'Optimal Routing Active';
+            document.getElementById('telemetry-distance').innerText = `${totalDist.toFixed(1)}m`;
+            
+            // Average structural pedestrian walking velocity is 1.4 m/s
+            const walkTimeSeconds = Math.round(totalDist / 1.2);
+            document.getElementById('telemetry-time').innerText = `${walkTimeSeconds}s`;
+
+            // Setup path spline rendering in 3D scene
+            drawPathLine(rawPath);
+
+            // Populate simulation parameters
+            currentSimPath = rawPath;
+            currentSimIndex = 0;
+            document.getElementById('sim-node-counter').innerText = `0/${currentSimPath.length}`;
+
+            // Highlight target waypoint visual pins
+            resetAllWaypointPinColors();
+            setWaypointPinColor(startNodeId, '#10b981'); // Emerald Start
+            setWaypointPinColor(destNodeId, '#06b6d4'); // Cyan Target
+        }
+
+        function clearRouting() {
+            clearRoutingMesh();
+            resetAllWaypointPinColors();
+            stopRouteSimulation();
+            
+            // Reset dropdown forms
+            document.getElementById('destination-select').value = '';
+            
+            // Fade out overlay
+            const navOverlay = document.getElementById('nav-overlay');
+            navOverlay.style.opacity = '0';
+            navOverlay.style.pointerEvents = 'none';
+
+            // Reset Telemetry panel
+            document.getElementById('telemetry-status').className = 'text-brand-amber font-semibold';
+            document.getElementById('telemetry-status').innerText = 'Awaiting Target...';
+            document.getElementById('telemetry-distance').innerText = '0.0m';
+            document.getElementById('telemetry-time').innerText = '0s';
+        }
+
+        function clearRoutingMesh() {
+            if (activePathMesh) {
+                scene.remove(activePathMesh);
+                activePathMesh.geometry.dispose();
+                activePathMesh = null;
+            }
+        }
+
+        function setWaypointPinColor(nodeId, hexColor) {
+            const pin = waypointVisuals[nodeId];
+            if (pin) {
+                pin.material.color.set(hexColor);
+                pin.scale.set(1.5, 1.5, 1.5);
+            }
+        }
+
+        function resetAllWaypointPinColors() {
+            for (const key in waypointVisuals) {
+                const pin = waypointVisuals[key];
+                if (pin) {
+                    pin.material.color.set('#334155');
+                    pin.scale.set(1.0, 1.0, 1.0);
+                }
+            }
+        }
+
+        // Catmull-Rom math to smooth out jagged corner vectors on pathlines
+        function drawPathLine(pathNodeIds) {
+            clearRoutingMesh();
+
+            const pathVectors = [];
+            pathNodeIds.forEach(nodeId => {
+                const n = nodes[nodeId];
+                // Lift path slightly off floor plates to prevent visual clipping (z-fighting)
+                pathVectors.push(new THREE.Vector3(n.x, n.y + 0.5, n.z));
+            });
+
+            // If only 2 nodes, linear line, else generate cubic spline curve
+            let curvePoints = [];
+            if (pathVectors.length < 3) {
+                curvePoints = pathVectors;
+            } else {
+                const curve = new THREE.CatmullRomCurve3(pathVectors);
+                curve.curveType = 'centripetal';
+                curvePoints = curve.getPoints(100); // Tessellate curve points
+            }
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+            
+            // Dynamic neon glow animating material
+            const pathMaterial = new THREE.LineDashedMaterial({
+                color: '#06b6d4',
+                linewidth: 5,
+                dashSize: 1.5,
+                gapSize: 1.0
+            });
+
+            activePathMesh = new THREE.Line(geometry, pathMaterial);
+            activePathMesh.computeLineDistances(); // Required for animated dash layers
+            scene.add(activePathMesh);
+        }
+
+        /* ==========================================
+           5. ACTIVE SCENE SIMULATION & ANIMATION LOOP
+           ========================================== */
+        function toggleRouteSimulation() {
+            if (currentSimPath.length === 0) return;
+
+            const btn = document.getElementById('sim-play-btn');
+            const icon = document.getElementById('sim-play-icon');
+            const text = document.getElementById('sim-play-text');
+
+            if (simulationActive) {
+                stopRouteSimulation();
+                btn.className = 'h-8 px-3 rounded-lg bg-brand-cyan text-slate-950 hover:bg-brand-cyan/80 transition-all font-bold text-xs flex items-center gap-1.5';
+                icon.className = 'fa-solid fa-play';
+                text.innerText = 'Simulate';
+            } else {
+                startRouteSimulation();
+                btn.className = 'h-8 px-3 rounded-lg bg-brand-amber text-slate-950 hover:bg-brand-amber/80 transition-all font-bold text-xs flex items-center gap-1.5 active-glow';
+                icon.className = 'fa-solid fa-pause';
+                text.innerText = 'Pause';
+            }
+        }
+
+        function startRouteSimulation() {
+            simulationActive = true;
+            
+            // Create a physical sphere avatar tracking the active nodes
+            if (!simMarker) {
+                const markerGeom = new THREE.SphereGeometry(0.8, 16, 16);
+                const markerMat = new THREE.MeshStandardMaterial({
+                    color: '#10b981',
+                    roughness: 0.1,
+                    metalness: 0.9,
+                    emissive: '#10b981',
+                    emissiveIntensity: 0.3
+                });
+                simMarker = new THREE.Mesh(markerGeom, markerMat);
+                scene.add(simMarker);
+            }
+            simMarker.visible = true;
+
+            const speedFactor = 1500; // Sim walking intervals in milliseconds
+            currentSimIndex = 0;
+
+            const runStep = () => {
+                if (currentSimIndex >= currentSimPath.length) {
+                    stopRouteSimulation();
+                    showToast('Destination Reached successfully');
+                    return;
+                }
+
+                const currentNodeId = currentSimPath[currentSimIndex];
+                const nodeData = nodes[currentNodeId];
+
+                // Direct transition animation
+                new anime({
+                    targets: simMarker.position,
+                    x: nodeData.x,
+                    y: nodeData.y + 0.8,
+                    z: nodeData.z,
+                    duration: 900,
+                    easing: 'easeInOutQuad'
+                });
+
+                document.getElementById('sim-node-counter').innerText = `${currentSimIndex + 1}/${currentSimPath.length}`;
+                document.getElementById('telemetry-node').innerText = currentNodeId;
+
+                // Sync elevator portal position with elevator cab animations
+                if (currentNodeId.includes('elevator')) {
+                    new anime({
+                        targets: elevatorCabMesh.position,
+                        y: nodeData.y,
+                        duration: 800,
+                        easing: 'easeInOutCubic'
+                    });
+                }
+
+                currentSimIndex++;
+                simInterval = setTimeout(runStep, speedFactor);
+            };
+
+            runStep();
+        }
+
+        function stopRouteSimulation() {
+            simulationActive = false;
+            if (simInterval) {
+                clearTimeout(simInterval);
+                simInterval = null;
+            }
+            if (simMarker) {
+                simMarker.visible = false;
+            }
+
+            const btn = document.getElementById('sim-play-btn');
+            const icon = document.getElementById('sim-play-icon');
+            const text = document.getElementById('sim-play-text');
+            
+            btn.className = 'h-8 px-3 rounded-lg bg-brand-cyan text-slate-950 hover:bg-brand-cyan/80 transition-all font-bold text-xs flex items-center gap-1.5';
+            icon.className = 'fa-solid fa-play';
+            text.innerText = 'Simulate';
+        }
+
+        // Trigger dynamic, visual radar structure scan wave pulse
+        function triggerAcousticScanPulse() {
+            showToast('Initializing active structural scan pulse');
+
+            // Generate temporary glowing wireframe radar spheres in 3D space
+            const scanWaveGeom = new THREE.SphereGeometry(1, 32, 32);
+            const scanWaveMat = new THREE.MeshBasicMaterial({
+                color: '#10b981',
+                wireframe: true,
+                transparent: true,
+                opacity: 0.4
+            });
+            const scanWave = new THREE.Mesh(scanWaveGeom, scanWaveMat);
+            
+            // Pulse expands outward from starting location
+            const startLoc = nodes[startNodeId];
+            scanWave.position.set(startLoc.x, startLoc.y + 0.5, startLoc.z);
+            scene.add(scanWave);
+
+            new anime({
+                targets: scanWave.scale,
+                x: 60,
+                y: 60,
+                z: 60,
+                duration: 2500,
+                easing: 'easeOutQuart',
+                complete: () => {
+                    scene.remove(scanWave);
+                    scanWaveGeom.dispose();
+                    scanWaveMat.dispose();
+                }
+            });
+
+            new anime({
+                targets: scanWaveMat,
+                opacity: 0,
+                duration: 2500,
+                easing: 'easeOutQuart'
+            });
+        }
+
+        // Central RequestAnimationFrame loop
+        function animate(timestamp) {
+            requestAnimationFrame(animate);
+
+            // Update user OrbitControls state
+            controls.update();
+
+            // Animate moving dashes along calculated pathlines
+            if (activePathMesh && activePathMesh.material) {
+                activePathMesh.material.dashOffset -= 0.05;
+            }
+
+            // Simple wave floats for pins (adds high tech breathing movement)
+            const pulse = Math.sin(Date.now() * 0.003) * 0.15;
+            for (const key in waypointVisuals) {
+                const pin = waypointVisuals[key];
+                if (pin && pin.visible) {
+                    pin.position.y = nodes[key].y + 1.5 + pulse;
+                    pin.rotation.y += 0.01;
+                }
+            }
+
+            // Sync rendering frame
+            renderer.render(scene, camera);
+        }
+
+        /* ==========================================
+           6. INITIALIZATION SEQUENCE
+           ========================================== */
+        window.onload = function() {
+            // Build the WebGL canvas engine
+            init3DEngine();
+
+            // Direct route configurations to auto-calculate base path
+            calculateRoute();
+            
+            // External AnimeJS library import check fallback
+            if (typeof anime === 'undefined') {
+                const s = document.createElement('script');
+                s.src = "https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js";
+                s.onload = () => { console.log("Spline animation engine fully initialized."); };
+                document.head.appendChild(s);
+            }
+        };
+    </script>
+</body>
+</html>
