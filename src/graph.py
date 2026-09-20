@@ -128,7 +128,7 @@ def compute_composite_metric(delay: float, bandwidth: float) -> float:
     """Calculate composite link weight metric W = delay + (1 / bandwidth)."""
     if bandwidth <= 0:
         return float("inf")
-    return delay + (1.0 / bandwidth)
+    return round(delay+(1.0/bandwidth),4)
 
 
 # Alias for backward compatibility
