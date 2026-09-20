@@ -78,7 +78,9 @@ def bellman_ford_distance_vector(
         )
     )
 
-    max_iterations = 2
+    # a distance vector needs up to |V|-1 rounds to reach the far side of the
+    # network; still updating after that means a negative cycle
+    max_iterations = max(1, len(all_nodes) - 1)
     iteration = 1
     has_negative_cycle = False
 
