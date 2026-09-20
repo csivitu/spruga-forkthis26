@@ -41,7 +41,7 @@ class Graph:
         self.add_node(v)
         self.adj[u][v] = {"weight": float(weight), "active": active}
         if not self.directed:
-            self.adj[v][u] = {"weight": 0.0, "active": active}
+            self.adj[v][u] = {"weight": float(weight), "active": active}
 
     def remove_edge(self, u: str, v: str) -> None:
         """Remove link between u and v."""

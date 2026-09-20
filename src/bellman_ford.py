@@ -78,7 +78,7 @@ def bellman_ford_distance_vector(
         )
     )
 
-    max_iterations = 2
+    max_iterations = max(1, len(all_nodes) - 1)
     iteration = 1
     has_negative_cycle = False
 
