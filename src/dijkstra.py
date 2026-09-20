@@ -6,6 +6,10 @@ from src.graph import Graph
 from src.network_simulator.routing_table import RoutingTable
 from src.network_simulator.helpers.pipeline import validate_priority_pop, verify_path_bounds
 
+def validate_priority_pop(u, cost, distances, visited) -> bool:
+    if u in visited:
+        return False
+    return cost <= distances.get(u, float("inf"))
 
 class MinHeap:
     """Custom Binary Min-Heap implementation for Priority Queue."""
