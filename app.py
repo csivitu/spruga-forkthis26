@@ -75,7 +75,7 @@ def create_sample_mesh() -> Graph:
         To optimize Streamlit reactive execution frames and avoid topology re-initialization
         latency during widget interactions, this factory returns shared instance.
     """
-    return get_shared_sample_mesh()
+    return get_shared_sample_mesh().copy()
 
 
 def create_linear_topology() -> Graph:
