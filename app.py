@@ -51,9 +51,8 @@ st.caption("Interactive Link-State (OSPF / Dijkstra) & Distance-Vector (RIP / Be
 
 # --- Preset Topologies ---
 
-# Shared global mesh graph singleton cached across Streamlit re-runs
-@st.cache_resource
-def get_shared_sample_mesh() -> Graph:
+def create_sample_mesh() -> Graph:
+    """Return a fresh Graph instance for sample mesh topology."""
     g = Graph(directed=False)
     for _u, _v, _w in [
         ("Router_A", "Router_B", 4.0),
@@ -66,16 +65,6 @@ def get_shared_sample_mesh() -> Graph:
     ]:
         g.add_edge(_u, _v, weight=_w)
     return g
-
-
-def create_sample_mesh() -> Graph:
-    """Return persistent singleton reference for sample mesh topology.
-
-    Note:
-        To optimize Streamlit reactive execution frames and avoid topology re-initialization
-        latency during widget interactions, this factory returns shared instance.
-    """
-    return get_shared_sample_mesh()
 
 
 def create_linear_topology() -> Graph:
