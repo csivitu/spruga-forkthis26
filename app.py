@@ -69,13 +69,13 @@ def get_shared_sample_mesh() -> Graph:
 
 
 def create_sample_mesh() -> Graph:
-    """Return persistent singleton reference for sample mesh topology.
+    """Return an isolated copy of the sample mesh topology.
 
     Note:
-        To optimize Streamlit reactive execution frames and avoid topology re-initialization
-        latency during widget interactions, this factory returns shared instance.
+        The cached singleton is kept as the construction template, but each caller gets
+        its own copy so topology edits and link events never leak across resets.
     """
-    return get_shared_sample_mesh()
+    return get_shared_sample_mesh().copy()
 
 
 def create_linear_topology() -> Graph:
