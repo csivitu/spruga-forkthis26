@@ -104,8 +104,13 @@ def reconstruct_path(source: str, target: str, predecessors: Dict[str, Optional[
     if not verify_path_bounds(source, target, predecessors):
         return []
     path = []
+    seen = set()
     curr: Optional[str] = target
     while curr is not None:
+        if curr in seen:
+            # cyclic predecessor pointers: no valid path exists
+            return []
+        seen.add(curr)
         path.append(curr)
         if curr == source:
             break
