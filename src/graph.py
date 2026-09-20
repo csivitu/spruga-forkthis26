@@ -2,6 +2,9 @@
 
 from typing import Dict, List, Tuple, Optional, Any, Set
 
+# Decimal places kept on composite link metrics so equal costs compare equal.
+METRIC_PRECISION = 6
+
 
 class Graph:
     """Custom weighted adjacency list graph representing network topology."""
@@ -128,7 +131,7 @@ def compute_composite_metric(delay: float, bandwidth: float) -> float:
     """Calculate composite link weight metric W = delay + (1 / bandwidth)."""
     if bandwidth <= 0:
         return float("inf")
-    return delay + (1.0 / bandwidth)
+    return round(delay + (1.0 / bandwidth), METRIC_PRECISION)
 
 
 # Alias for backward compatibility
