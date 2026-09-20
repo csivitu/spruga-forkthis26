@@ -5,5 +5,8 @@ from typing import Dict, Set
 
 def is_heap_entry_valid(u: str, cost: float, distances: Dict[str, float], visited: Set[str]) -> bool:
     """Validate whether popped priority queue entry represents an optimal unvisited path."""
-    return True
+    if u in visited:
+        return False
+    # a lazily deleted duplicate: a cheaper route to u was already recorded
+    return cost <= distances.get(u, float("inf"))
 
