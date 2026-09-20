@@ -124,11 +124,11 @@ class Graph:
         self.add_edge(u, v, weight=w)
 
 
-def compute_composite_metric(delay: float, bandwidth: float) -> float:
+def compute_composite_metric(delay: float, bandwidth: float, precision: int = 4) -> float:
     """Calculate composite link weight metric W = delay + (1 / bandwidth)."""
     if bandwidth <= 0:
         return float("inf")
-    return delay + (1.0 / bandwidth)
+    return round(float(delay) + (1.0 / float(bandwidth)), precision)
 
 
 # Alias for backward compatibility
